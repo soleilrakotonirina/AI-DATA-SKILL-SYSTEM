@@ -1062,16 +1062,17 @@ EOF
 npm list --depth=0
 ```
 
-Tu dois voir `@directus/sdk`, `plotly.js`, `react-plotly.js`, `@mdx-js/react`, `next-mdx-remote`, `lucide-react`, `recharts`, `zustand` dans la liste.
+on doit voir `@directus/sdk`, `plotly.js`, `react-plotly.js`, `@mdx-js/react`, `next-mdx-remote`, `lucide-react`, `recharts`, `zustand` dans la liste.
 
 ### Vérification finale
+
 ```bash
 npm run dev
 # Attendu :
 #  ▲ Next.js 14.2.18
 #  ✓ Ready in ~5s
 #  ✓ Compiled /
-
+```
 ---
 
 ## Phase 0.7 — Variables d'environnement Frontend
