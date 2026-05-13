@@ -1,0 +1,113 @@
+# =============================================================================
+# .gitignore — AI DATA SKILL SYSTEM 2026
+# =============================================================================
+
+# ── Secrets et configuration locale ─────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.venv/
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ── Node.js / Next.js ───────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+build/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ── Directus ────────────────────────────────────────────────────────────────
+directus/database/*.db
+directus/database/*.db-journal
+directus/uploads/
+directus/extensions/
+
+# ── Données lourdes et modèles ──────────────────────────────────────────────
+backend/data/raw/*
+backend/data/processed/*
+backend/data/external/*
+backend/models/*.pkl
+backend/models/*.joblib
+backend/outputs/*
+!backend/data/raw/.gitkeep
+!backend/data/processed/.gitkeep
+!backend/data/external/.gitkeep
+!backend/models/.gitkeep
+!backend/outputs/.gitkeep
+
+# ── Notebooks ──────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── IDE ─────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# ── Logs ────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Frontend ────────────────────────────────────────────────────────────────
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+frontend/node_modules
+frontend/.pnp
+frontend/.pnp.*
+frontend/.yarn/*
+frontend/!/.yarn/patches
+frontend/!/.yarn/plugins
+frontend/!/.yarn/releases
+frontend/!/.yarn/versions
+
+# testing
+frontend/coverage
+
+# next.js
+frontend/.next/
+frontend/out/
+
+# production
+frontend/build
+
+# misc
+frontend/.DS_Store
+frontend/*.pem
+
+# debug
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+frontend/.env*
+
+# vercel
+frontend/.vercel
+
+# typescript
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
