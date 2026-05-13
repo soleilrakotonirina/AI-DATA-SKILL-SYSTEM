@@ -1082,6 +1082,7 @@ npm run dev
 Copier ce contenu dans `frontend/.env.local.example`.
 
 ```bash
+
 # =============================================================================
 # .env.local.example — Frontend Next.js AI DATA SKILL SYSTEM
 # =============================================================================
@@ -1361,25 +1362,25 @@ Les 3 services tournent et communiquent correctement.
 Cocher chaque case avant de passer à l'Étape 1.
 
 ```
-[ ] Racine ai-data-skill-system/ initialisée avec git init
-[ ] .gitignore copié à la racine
-[ ] Backend venv créé et activé
-[ ] requirements.txt rempli et installé via pip install -r requirements.txt
-[ ] api/main.py rempli dans backend/api/main.py
-[ ] Script setup_backend_structure.sh exécuté
-[ ] .env.example rempli dans backend/
-[ ] .env généré et 3 valeurs critiques renseignées (Gemini, Directus URL, Directus token)
-[ ] Directus initialisé via npm init directus-project
-[ ] 5 collections Directus créées (sessions, reports_mdx, charts, pipeline_logs, user_profiles)
-[ ] Token admin Directus généré et reporté dans backend/.env
-[ ] Snapshot du schéma exporté : directus/snapshots/schema.json
-[ ] Next.js initialisé via create-next-app dans frontend/
-[ ] package.json remplacé par la version complète (avec toutes les dépendances)
-[ ] npm install exécuté dans frontend/ (toutes les dépendances en une commande)
-[ ] .env.local rempli dans frontend/
-[ ] test_setup.py rempli dans backend/tests/
-[ ] Les 3 services démarrent sans erreur
-[ ] python tests/test_setup.py affiche 4 OK
+[x] Racine ai-data-skill-system/ initialisée avec git init
+[x] .gitignore copié à la racine
+[x] Backend venv créé et activé
+[x] requirements.txt rempli et installé via pip install -r requirements.txt
+[x] api/main.py rempli dans backend/api/main.py
+[x] Script setup_backend_structure.sh exécuté
+[x] .env.example rempli dans backend/
+[x] .env généré et 3 valeurs critiques renseignées (Gemini, Directus URL, Directus token)
+[x] Directus initialisé via npm init directus-project
+[x] 5 collections Directus créées (sessions, reports_mdx, charts, pipeline_logs, user_profiles)
+[x] Token admin Directus généré et reporté dans backend/.env
+[x] Snapshot du schéma exporté : directus/snapshots/schema.json
+[x] Next.js initialisé via create-next-app dans frontend/
+[x] package.json remplacé par la version complète (avec toutes les dépendances)
+[x] npm install exécuté dans frontend/ (toutes les dépendances en une commande)
+[x] .env.local rempli dans frontend/
+[x] test_setup.py rempli dans backend/tests/
+[x] Les 3 services démarrent sans erreur
+[x] python tests/test_setup.py affiche 4 OK
 ```
 
 ---
