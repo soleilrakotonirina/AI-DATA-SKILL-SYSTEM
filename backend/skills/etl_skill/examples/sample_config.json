@@ -1,0 +1,19 @@
+{
+  "step": 1,
+  "skill": "ETL",
+  "endpoint": "/api/etl/run",
+  "params": {
+    "session_id": "user_demo_2026-05-14_14-30-22",
+    "input_path": "data/raw/Donnees_Universitaires.xlsx",
+    "missing_strategy": "auto",
+    "fill_mode": "smart",
+    "outlier_action": "cap",
+    "outlier_method": "iqr",
+    "encode_method": "auto",
+    "scale_method": "standard",
+    "generate_script": true,
+    "dimensional_modeling": false,
+    "target_column": "Etudiant",
+    "columns_to_exclude": ["ID_Etudiant", "Niveau_Etude"]
+  }
+}

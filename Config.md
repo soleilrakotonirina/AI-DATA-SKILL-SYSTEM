@@ -1,4 +1,4 @@
-# CONFIG.md — Étape 0 : Setup Complet
+# Étape 0 : Setup Complet
 
 **AI DATA SKILL SYSTEM** — Procédure pas à pas pour monter l'environnement de dev complet.
 
@@ -19,7 +19,7 @@ Stack : Next.js 14 + FastAPI + Pydantic + Directus SQLite + Gemini.
 Avant de commencer, vérifier les versions installées.
 
 ```bash
-python --version    # >= 3.10
+uv --version        # >= 0.9.2
 node --version      # >= 18
 npm --version       # >= 9
 git --version       # >= 2.30
@@ -31,73 +31,25 @@ Si une version manque, l'installer avant d'aller plus loin.
 
 ### Installation des pré-requis manquants
 
-#### Linux / macOS
 
-**Python >= 3.10**
-```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install -y python3 python3-pip python3-venv
-
-# macOS (Homebrew)
-brew install python@3.10
-
-# Vérifier
-python3 --version
-```
-
-**Node.js >= 18**
-```bash
-# Via nvm (recommandé — Linux & macOS)
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-source ~/.bashrc        # Linux
-source ~/.zshrc         # macOS
-nvm install 18
-nvm use 18
-
-# Ubuntu/Debian sans nvm
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-sudo apt install -y nodejs
-
-# macOS sans nvm
-brew install node@18
-
-# Vérifier
-node --version
-npm --version
-```
-
-**Git >= 2.30**
-```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install -y git
-
-# macOS
-brew install git
-
-# Vérifier
-git --version
-```
-
-**Alias `python` si manquant**
-```bash
-# Si python --version échoue mais python3 fonctionne
-sudo ln -s /usr/bin/python3 /usr/bin/python
-```
-
----
 
 #### Windows
 
-**Python >= 3.10**
+**UV (gestionnaire Python)**
 ```powershell
 # Via winget
-winget install Python.Python.3.10
+winget install astral-sh.uv
 
-# Ou télécharger l'installeur sur https://www.python.org/downloads/
-# Cocher "Add Python to PATH" pendant l'installation
+# Ou via PowerShell (installation officielle)
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Installer et épingler Python 3.12 via uv
+uv python install 3.12
+uv python pin 3.12
 
 # Vérifier (PowerShell)
-python --version
+uv --version
+uv python list
 ```
 
 **Node.js >= 18**
@@ -133,11 +85,66 @@ git --version
 Après installation, relancer les vérifications avant de continuer :
 
 ```bash
-python --version    # >= 3.10
+uv --version        # >= 0.9.2
 node --version      # >= 18
 npm --version       # >= 9
 git --version       # >= 2.30
 ```
+---
+
+#### Linux / macOS
+
+**UV (gestionnaire Python)**
+```bash
+# Linux / macOS (installation officielle)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Recharger le shell
+source ~/.bashrc        # Linux
+source ~/.zshrc         # macOS
+
+# Installer et épingler Python 3.12 via uv
+uv python install 3.12
+uv python pin 3.12
+
+# Vérifier
+uv --version
+uv python list
+```
+
+**Node.js >= 18**
+```bash
+# Via nvm (recommandé — Linux & macOS)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+source ~/.bashrc        # Linux
+source ~/.zshrc         # macOS
+nvm install 18
+nvm use 18
+
+# Ubuntu/Debian sans nvm
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# macOS sans nvm
+brew install node@18
+
+# Vérifier
+node --version
+npm --version
+```
+
+**Git >= 2.30**
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install -y git
+
+# macOS
+brew install git
+
+# Vérifier
+git --version
+```
+
 
 ---
 
@@ -244,9 +251,10 @@ logs/
 mkdir backend
 cd backend
 
-python -m venv venv
-venv\Scripts\activate          # Windows PowerShell
-# source venv/bin/activate         # Linux / Mac
+uv init .
+uv venv
+source .venv/bin/activate          # Linux / Mac
+# .venv\Scripts\activate           # Windows PowerShell
 ```
 
 ### Fichier `backend/requirements.txt`
@@ -370,11 +378,10 @@ pytest-asyncio>=0.23.0
 ### Installation des dépendances
 
 ```bash
-pip install --upgrade pip
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 # Vérification
-python -c "import fastapi, pydantic, pandas, numpy, sklearn, plotly, shap, lightgbm, xgboost; print('Toutes les librairies sont installées')"
+uv run python -c "import fastapi, pydantic, pandas, numpy, sklearn, plotly, shap, lightgbm, xgboost; print('Toutes les librairies sont installées')"
 ```
 
 ### Fichier `backend/api/main.py`
@@ -764,122 +771,6 @@ Sortie attendue.
 
 Aller sur http://localhost:8055 et se connecter avec les identifiants admin.
 
-### Création des 5 collections
-
-Naviguer dans `Settings → Data Model → Create Collection`. Construire les 5 collections suivantes avec leurs champs exacts.
-
-#### Collection 1 — `sessions`
-* Rôle : Représente une exécution complète du pipeline IA — du moment où l'utilisateur lance une analyse jusqu'à la fin.
-  
-```
-Collection name   : sessions
-Primary key field : id (UUID, generate on create)
-
-Champs :
-- user_id          (String)
-- dataset_name     (String) 
-- started_at       (Datetime, default : CURRENT_TIMESTAMP) 
-- ended_at         (Datetime, nullable) 
-- skills_used      (JSON) 
-- status           (Dropdown : running, success, error → default : running)
-- duration_ms      (Integer, nullable) 
-```
-
-| Champ | Utilité concrète |
-|---|---|
-| `user_id` | Qui a lancé l'analyse: ID de l'utilisateur (email ou UUID) |
-| `dataset_name` | Quel dataset traité: Nom du dataset analysé (ex: "titanic.csv") |
-| `started_at` | Quand l'analyse a été lancée: Timestamp de début de session,  auto-rempli |
-| `ended_at` | Quand l'analyse a été terminée: Timestamp de fin de session, rempli à la fin du pipeline, null si encore en cours |
-| `skills_used` | Quels Skills ont été utilisés: Liste des Skills exécutés dans cette session (ex: ["ETL", "Visualization", "Modeling"]) |
-| `status` | Statut global de la session: "running" tant que le pipeline n'est pas terminé, "success" si tout s'est bien passé, "error" si une erreur a interrompu le pipeline |
-| `duration_ms` | Durée totale de la session en millisecondes: Calculé à la fin du pipeline (ended_at - started_at), null si encore en cours |
-
-
-#### Collection 2 — `reports_mdx`
-
-```
-Collection name   : reports_mdx
-Primary key field : id (UUID, generate on create)
-
-Champs :
-- session_id       (Relationship M2O → sessions)
-- type             (Dropdown : etl, eda, model_card, analysis, explanation)
-- title            (String)
-- content_mdx      (Markdown/MDX)
-- created_at       (Datetime, default : CURRENT_TIMESTAMP)
-```
-
-
-| Champ | Utilité concrète |
-|---|---|
-| `session_id` | Relie le rapport à sa session parente |
-| `type` | Catégorie du rapport : `etl` (nettoyage), `eda` (exploration: Exploratory Data Analysis), `model_card` (fiche modèle), `analysis` (analyse), `explanation` (explication) |
-| `title` | Titre du rapport affiché: "Rapport d'EDA", "Fiche Modèle XGBoost", etc. |
-| `content_mdx` | Contenu du rapport au format MDX généré par LLM: texte enrichi + graphiques intégrés |
-| `created_at` | Quand ce rapport a été produit |
-
-#### Collection 3 — `charts`
-
-```
-Collection name   : charts
-Primary key field : id (UUID, generate on create)
-
-Champs :
-- session_id       (Relationship M2O → sessions)
-- title            (String)
-- chart_type       (String : histogram, boxplot, heatmap, roc, confusion, shap)
-- plotly_json      (JSON)
-- png_file         (File, nullable, relation vers directus_files)
-- created_at       (Datetime, default : CURRENT_TIMESTAMP)
-```
-
-
-| Champ | Utilité concrète |
-|---|---|
-| `session_id` | Relie le rapport à sa session |
-| `title` | Titre du graphique affiché: "Distribution de l'âge", "Matrice de confusion", etc. |
-| `chart_type` | Type de graphique pour le rendu frontend: histogram, boxplot, heatmap, roc, confusion, shap, etc. |
-| `plotly_json` | Données du graphique au format JSON exporté par plotly (pour rendu interactif dans Next.js) |
-| `png_file` | Fichier image statique du graphique (optionnel, utilisé pour les graphiques SHAP complexes qui ne s'intègrent pas bien en JSON) - Relation vers `directus_files` → image statique pour exports PDF |
-| `created_at` | Quand ce graphique a été produit |
-
-#### Collection 4 — `pipeline_logs`
-
-```
-Collection name   : pipeline_logs
-Primary key field : id (UUID, generate on create)
-
-Champs :
-- session_id       (Relationship M2O → sessions)
-- skill            (String)
-- action           (String)
-- status           (Dropdown : running, success, error)
-- message          (Text)
-- timestamp        (Datetime, default : CURRENT_TIMESTAMP)
-```
-
-| Champ | Utilité concrète |
-|---|---|
-| `session_id` | Relie le rapport à sa session parente |
-| `skill` | Quel Skill est en cours d'exécution: "ETL", "Visualization", "Modeling", etc. |
-| `action` | Quelle action précise est en cours: "Chargement du dataset" `"load_csv"`, "Nettoyage des valeurs manquantes"  `"remove_nulls"`, "Entraînement du modèle XGBoost" `"train_model"`, etc. |
-| `status` | Statut de cette action : "running" tant que l'action n'est pas terminée, "success" si elle s'est bien passée, "error" si une erreur a interrompu cette action |
-| `message` | Détails supplémentaires sur l'action  : messages d'erreur, métriques intermédiaires, etc. |
-| `timestamp` | Quand cette action a été loggée |   
-#### Collection 5 — `user_profiles`
-
-```
-Collection name   : user_profiles
-Primary key field : id (UUID, generate on create)
-
-Champs :
-- user_id          (String, unique)
-- sessions_count   (Integer, default : 0)
-- last_active      (Datetime, default : CURRENT_TIMESTAMP)
-- preferences      (JSON, default : {})
-```
-
 ### Génération du token admin
 
 Aller dans `Users → Access Tokens → Create Token`.
@@ -887,20 +778,271 @@ Aller dans `Users → Access Tokens → Create Token`.
 ```
 Name        : fastapi-backend-token
 Expiration  : Never (ou 1 year)
-Role        : Admin
+Role        : Administrator
 ```
 
 Copier le token long (30+ caractères) et le coller dans `backend/.env` ligne `DIRECTUS_TOKEN=`.
 
-### Export du snapshot de schéma (versionnable Git)
+### Setup automatique — Collections + Permissions
 
+> ⚠️ **Ne pas créer les collections manuellement via l'interface.**
+> Le script ci-dessous fait tout : schéma, champs, relations et permissions.
+ 
+#### Prérequis
+ 
+- Directus tourne sur `http://localhost:8055`
+- `DIRECTUS_TOKEN` renseigné dans `backend/.env`
+- Node.js installé (pour `npx directus`)
+- `snapshots/schema.json` présent (fourni dans le repo)
+
+#### Linux / macOS
+ 
 ```bash
-# Depuis le dossier directus/
+cd directus
+bash setup_directus.sh
+```
+ 
+#### Windows PowerShell
+ 
+```powershell
+# Autoriser les scripts (une seule fois)
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+ 
+cd directus
+.\setup_directus.ps1
+```
+
+#### Ce que le script fait automatiquement
+ 
+| Étape | Action |
+|---|---|
+| 1 | Attend que Directus soit prêt |
+| 2 | Vérifie que le token est valide |
+| 3 | Applique `snapshots/schema.json` (collections + champs + relations) |
+| 4 | Détecte la policy Administrator (compatible Directus 11) |
+| 5 | Crée les permissions `create / read / update / delete` pour chaque collection |
+| 6 | Vérifie l'accès à chaque collection et affiche le résultat |
+ 
+Sortie attendue en fin de script :
+ 
+```
+✅  sessions      — 13 champs : id, sort, user_created, ...
+✅  reports_mdx   — 6 champs  : id, session_id, type, ...
+✅  charts        — 7 champs  : id, session_id, title, ...
+✅  pipeline_logs — 7 champs  : id, session_id, skill, ...
+✅  user_profiles — 5 champs  : id, user_id, sessions_count, ...
+ 
+🎉  Setup terminé avec succès !
+```
+
+### Création des 5 collections
+
+Naviguer dans `Settings → Data Model → Create Collection`. Construire les 5 collections suivantes avec leurs champs exacts.
+
+#### Collection 1 — `sessions`
+* Rôle : Représente une exécution complète du pipeline IA — du moment où l'utilisateur lance une analyse jusqu'à la fin.
+  
+Collection name   : sessions
+
+```
+Primary key : id (UUID, generate on create)
+ 
+Champs :
+- user_id        (String)
+- dataset_name   (String, required)
+- started_at     (Datetime)
+- ended_at       (Datetime, nullable)
+- skills_used    (JSON)
+- status         (Dropdown : running | success | error, default : running)
+- duration_ms    (Integer, nullable)
+```
+ 
+| Champ | Utilité |
+|---|---|
+| `user_id` | ID de l'utilisateur qui a lancé l'analyse (email ou UUID) |
+| `dataset_name` | Nom du dataset analysé (ex : `titanic.csv`) |
+| `started_at` | Timestamp de début, auto-rempli |
+| `ended_at` | Timestamp de fin, null si encore en cours |
+| `skills_used` | Liste des Skills exécutés (ex : `["ETL", "Visualization"]`) |
+| `status` | `running` → `success` ou `error` en fin de pipeline |
+| `duration_ms` | `ended_at - started_at` en ms, null si en cours |
+
+#### Collection 2 — `reports_mdx`
+* Rôle : Stocke les rapports générés par les Skills au format MDX (Markdown enrichi avec graphiques intégrés). Chaque rapport est lié à une session.
+
+Collection name   : reports_mdx
+
+```
+Primary key : id (UUID, generate on create)
+ 
+Champs :
+- session_id    (M2O → sessions)
+- type          (Dropdown : etl | eda | model_card | analysis | explanation)
+- title         (String)
+- content_mdx   (Markdown/MDX)
+- created_at    (Datetime)
+```
+ 
+| Champ | Utilité |
+|---|---|
+| `session_id` | Relie le rapport à sa session parente |
+| `type` | Catégorie : `etl` (nettoyage), `eda` (exploration), `model_card`, `analysis`, `explanation` |
+| `title` | Ex : "Rapport d'EDA", "Fiche Modèle XGBoost" |
+| `content_mdx` | Contenu MDX généré par le LLM |
+| `created_at` | Date de production du rapport |
+ 
+
+
+#### Collection 3 — `charts`
+* Rôle : Stocke les graphiques générés par les Skills. Chaque graphique est lié à une session et peut être intégré dans les rapports MDX via des relations.
+
+Collection name   : charts
+
+
+```
+Primary key : id (UUID, generate on create)
+ 
+Champs :
+- session_id    (M2O → sessions)
+- title         (String)
+- chart_type    (Dropdown : histogram | boxplot | heatmap | roc | confusion | shap)
+- plotly_json   (JSON)
+- png_file      (File → directus_files, nullable)
+- created_at    (Datetime)
+```
+ 
+| Champ | Utilité |
+|---|---|
+| `session_id` | Relie le graphique à sa session |
+| `title` | Ex : "Distribution de l'âge", "Matrice de confusion" |
+| `chart_type` | Type pour le rendu frontend |
+| `plotly_json` | JSON Plotly pour rendu interactif dans Next.js |
+| `png_file` | Image statique optionnelle (exports PDF, graphiques SHAP complexes) |
+| `created_at` | Date de production du graphique |
+
+
+#### Collection 4 — `pipeline_logs`
+* Rôle : Stocke les logs détaillés de l'exécution du pipeline IA. Chaque log est lié à une session et correspond à une action précise dans un Skill (ex : "Chargement du dataset", "Entraînement du modèle XGBoost", etc.). Ces logs permettent de suivre en temps réel l'avancement du pipeline et de diagnostiquer les erreurs.
+
+Collection name   : pipeline_logs
+
+```
+Primary key : id (UUID, generate on create)
+ 
+Champs :
+- session_id   (M2O → sessions)
+- skill        (String)
+- action       (String)
+- status       (Dropdown : running | success | error, default : running)
+- message      (Text)
+- timestamp    (Datetime)
+```
+ 
+| Champ | Utilité |
+|---|---|
+| `session_id` | Relie le log à sa session parente |
+| `skill` | Skill en cours : `ETL`, `Visualization`, `Modeling`… |
+| `action` | Action précise : `load_csv`, `remove_nulls`, `train_model`… |
+| `status` | `running` → `success` ou `error` |
+| `message` | Détails : erreurs, métriques intermédiaires |
+| `timestamp` | Quand cette action a été loggée |
+   
+
+#### Collection 5 — `user_profiles`
+* Rôle : Stocke les profils utilisateurs. Chaque profil contient des informations sur l'utilisateur, son historique de sessions, et ses préférences. Cette collection permet de personnaliser l'expérience utilisateur (ex : recommandations de Skills, pré-remplissage de configurations) et de suivre l'engagement sur la plateforme.
+
+Collection name   : user_profiles
+
+```
+Primary key : id (UUID, generate on create)
+ 
+Champs :
+- user_id          (String, unique, indexed)
+- sessions_count   (Integer, default : 0)
+- last_active      (Datetime)
+- preferences      (JSON, default : {})
+```
+ 
+| Champ | Utilité |
+|---|---|
+| `user_id` | Identifiant unique de l'utilisateur (email ou UUID) |
+| `sessions_count` | Nombre total de sessions lancées |
+| `last_active` | Dernière activité |
+| `preferences` | Préférences utilisateur au format JSON |
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Relations entre collections
+```
+sessions ──< reports_mdx   (1 session → N rapports)
+sessions ──< charts        (1 session → N graphiques)
+sessions ──< pipeline_logs (1 session → N logs)
+charts.png_file ──> directus_files
+```
+
+
+### Versionner et réappliquer le schéma
+Le fichier `snapshots/schema.json` est versionnable dans Git.
+Pour régénérer un snapshot depuis un Directus configuré :
+ 
+```bash
+cd directus
 mkdir -p snapshots
 npx directus schema snapshot ./snapshots/schema.json
 ```
+ 
+Pour réappliquer le schéma sur un nouvel environnement (sans le script) :
+ 
+```bash
+npx directus schema apply ./snapshots/schema.json --yes
+```
+ 
+> ⚠️ `schema apply` seul ne configure pas les permissions.
+> Utiliser `setup_directus.sh` / `setup_directus.ps1` pour un setup complet en une commande.
 
-Le fichier `directus/snapshots/schema.json` est versionnable. Pour réappliquer le schéma sur un nouvel environnement, lancer `npx directus schema apply ./snapshots/schema.json`.
+### Variables d'environnement Directus
+ 
+| Variable | Obligatoire | Description |
+|---|---|---|
+| `KEY` | Oui | Clé de chiffrement (32 bytes hex) |
+| `SECRET` | Oui | Secret JWT (32 bytes hex) |
+| `DB_CLIENT` | Oui | `sqlite3` (zéro installation) |
+| `DB_FILENAME` | Oui | Chemin vers le fichier SQLite |
+| `ADMIN_EMAIL` | Oui (bootstrap) | Email de l'administrateur |
+| `ADMIN_PASSWORD` | Oui (bootstrap) | Mot de passe administrateur |
+ 
+Variables côté `backend/.env` :
+ 
+| Variable | Description |
+|---|---|
+| `DIRECTUS_URL` | URL du serveur Directus (défaut : `http://localhost:8055`) |
+| `DIRECTUS_TOKEN` | Token admin pour publier les rapports |
+
+### Validation de la Phase 0.5
+ 
+```
+[ ] Directus démarre sans erreur sur le port 8055
+[ ] Connexion admin possible sur http://localhost:8055
+[ ] Token généré et copié dans backend/.env
+[ ] bash setup_directus.sh (ou .\setup_directus.ps1) se termine sans erreur
+[ ] Les 5 collections sont visibles dans Settings → Data Model
+[ ] Chaque collection affiche tous ses champs
+[ ] Test curl réussi :
+    curl -H "Authorization: Bearer $DIRECTUS_TOKEN" http://localhost:8055/items/sessions
+    → {"data":[]}
+```
+ 
+Quand les 7 cases sont cochées, la Phase 0.5 est validée.
 
 ---
 
@@ -1304,7 +1446,7 @@ npx directus start
 
 ```bash
 cd backend
-source venv/bin/activate
+source .venv/bin/activate
 uvicorn api.main:app --reload --port 8000
 ```
 
@@ -1321,8 +1463,8 @@ npm run dev
 
 ```bash
 cd backend
-source venv/bin/activate
-python tests/test_setup.py
+source .venv/bin/activate
+uv run python tests/test_setup.py
 ```
 
 ### Sortie attendue
@@ -1362,6 +1504,7 @@ Les 3 services tournent et communiquent correctement.
 Cocher chaque case avant de passer à l'Étape 1.
 
 ```
+<<<<<<< HEAD
 [x] Racine ai-data-skill-system/ initialisée avec git init
 [x] .gitignore copié à la racine
 [x] Backend venv créé et activé
@@ -1381,6 +1524,27 @@ Cocher chaque case avant de passer à l'Étape 1.
 [x] test_setup.py rempli dans backend/tests/
 [x] Les 3 services démarrent sans erreur
 [x] python tests/test_setup.py affiche 4 OK
+=======
+[ ] Racine ai-data-skill-system/ initialisée avec git init
+[ ] .gitignore copié à la racine
+[ ] Backend venv créé et activé (uv venv + source .venv/bin/activate)
+[ ] requirements.txt rempli et installé via uv pip install -r requirements.txt
+[ ] api/main.py rempli dans backend/api/main.py
+[ ] Script setup_backend_structure.sh exécuté
+[ ] .env.example rempli dans backend/
+[ ] .env généré et 3 valeurs critiques renseignées (Gemini, Directus URL, Directus token)
+[ ] Directus initialisé via npm init directus-project
+[ ] 5 collections Directus créées (sessions, reports_mdx, charts, pipeline_logs, user_profiles)
+[ ] Token admin Directus généré et reporté dans backend/.env
+[ ] Snapshot du schéma exporté : directus/snapshots/schema.json
+[ ] Next.js initialisé via create-next-app dans frontend/
+[ ] package.json remplacé par la version complète (avec toutes les dépendances)
+[ ] npm install exécuté dans frontend/ (toutes les dépendances en une commande)
+[ ] .env.local rempli dans frontend/
+[ ] test_setup.py rempli dans backend/tests/
+[ ] Les 3 services démarrent sans erreur
+[ ] uv run python tests/test_setup.py affiche 4 OK
+>>>>>>> 69983b3 (feat(etl-skill): étape 1 — pipeline ETL intelligent et modélisation avancée)
 ```
 
 ---
@@ -1412,7 +1576,7 @@ Une fois l'Étape 0 finalisée, redémarrer le projet est simple. Ouvrir 3 termi
 cd directus && npx directus start
 
 # Terminal 2
-cd backend && source venv/bin/activate && uvicorn api.main:app --reload --port 8000
+cd backend && source .venv/bin/activate && uvicorn api.main:app --reload --port 8000
 
 # Terminal 3
 cd frontend && npm run dev
