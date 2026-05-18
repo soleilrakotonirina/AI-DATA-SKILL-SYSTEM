@@ -24,6 +24,7 @@ Plan JSON attendu :
 Utilisation CLI :
     python -m skills.etl_skill.scripts.main --plan path/to/plan.json
     python -m skills.etl_skill.scripts.main --input data/raw/dataset.csv --session-id mysession
+    python -m skills.etl_skill.scripts.main --url "https://dummyjson.com/products?limit=30&skip=0" --session-id mysession
 """
 
 from __future__ import annotations
@@ -166,6 +167,12 @@ def main() -> int:
         help="Chemin du dataset (mode simple, sans plan JSON)",
     )
     parser.add_argument(
+        "--url",
+        type=str,
+        default=None,
+        help="URL REST ou CSV distant (alternative a --input)",
+    )
+    parser.add_argument(
         "--session-id", "-s",
         type=str,
         default="cli_session",
@@ -201,8 +208,19 @@ def main() -> int:
                 "input_path": args.input,
             },
         }
+    elif getattr(args, "url", None):
+        plan = {
+            "step": 1,
+            "skill": "ETL",
+            "endpoint": "/api/etl/run",
+            "params": {
+                "session_id": args.session_id,
+                "input_path": None,
+                "input_url": args.url,
+            },
+        }
     else:
-        parser.error("Specifier --plan ou --input")
+        parser.error("Specifier --plan, --input ou --url")
         return 1
 
     # ── Executer le Skill ─────────────────────────────────────────────────────

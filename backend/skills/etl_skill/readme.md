@@ -210,7 +210,10 @@ uv run python -m skills.etl_skill.scripts.main --plan skills/etl_skill/examples/
 
 # Avec juste un fichier (autres params par defaut)
 
-uv run --env-file .env python -m skills.etl_skill.scripts.main   --input data/raw/customers.csv   --session-id session_star_report
+uv run --env-file .env python -m skills.etl_skill.scripts.main   --input data/raw/Donnees_Universitaires.csv   --session-id session_star_report
+
+# Avec URL (exemple avec API dummyjson)
+uv run --env-file .env python -m skills.etl_skill.scripts.main --url "https://dummyjson.com/products?limit=30&skip=0" --session-id session_dummyjson_test
 
 ```
 

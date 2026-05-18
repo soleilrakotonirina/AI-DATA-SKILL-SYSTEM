@@ -134,6 +134,85 @@ def generate_markdown_report(
         label = f"{step}" + (f" [{feuille}]" if feuille else "")
         params = entry.get("params", {})
 
+        # Section speciale pour la TABLE JOINTE (multi-feuilles)
+        if "creer_table_jointe" in step and params.get("liaisons"):
+            lines.append(f"### {i}. {label}")
+            lines.append("")
+
+            # Table de faits
+            lines.append("#### Table de faits identifiée")
+            lines.append("")
+            lines.append(f"`{params.get('table_fait', 'inconnue')}`")
+            lines.append("")
+
+            rows_j = params.get("rows_jointe", 0)
+            cols_j = params.get("cols_jointe", 0)
+            if rows_j:
+                lines.append(f"_Table jointe : **{rows_j:,} lignes × {cols_j} colonnes**_")
+                lines.append("")
+
+            # Feuilles fusionnees
+            lines.append("#### Feuilles fusionnées")
+            lines.append("")
+            feuilles = params.get("feuilles_sources", [])
+            lines.append(", ".join(f"`{f}`" for f in feuilles) if feuilles else "_aucune_")
+            lines.append("")
+
+            # Dimensions
+            dims_list = params.get("dimensions_tables", [])
+            if dims_list:
+                lines.append("#### Dimensions détectées")
+                lines.append("")
+                lines.append("| Dimension (table) | Colonne PK |")
+                lines.append("|-------------------|------------|")
+                pk_by_table = {l["cible_table"]: l["cible_col"]
+                              for l in params.get("liaisons", [])}
+                for dim in dims_list:
+                    pk = pk_by_table.get(dim, "?")
+                    lines.append(f"| `{dim}` | `{pk}` |")
+                lines.append("")
+
+            # Mesures
+            mesures = params.get("mesures", [])
+            lines.append("#### Mesures (colonnes numériques agrégeables)")
+            lines.append("")
+            if mesures:
+                lines.append(", ".join(f"`{m}`" for m in mesures))
+            else:
+                lines.append("_aucune mesure numérique détectée_")
+            lines.append("")
+
+            # Liaisons FK→PK
+            lines.append("#### Liaisons FK → PK détectées")
+            lines.append("")
+            lines.append("| Source (FK) | Cible (PK) | Coverage |")
+            lines.append("|-------------|------------|----------|")
+            for lien in params.get("liaisons", []):
+                src = f"`{lien.get('source_table')}.{lien.get('source_col')}`"
+                cible = f"`{lien.get('cible_table')}.{lien.get('cible_col')}`"
+                cov_val = lien.get("coverage", 0)
+                cov = f"{cov_val * 100:.0f}%"
+                lines.append(f"| {src} | {cible} | {cov} |")
+            lines.append("")
+
+            # Colonnes de la table jointe
+            fact_cols = params.get("fact_columns", [])
+            if fact_cols:
+                lines.append("#### Colonnes de la table jointe (table de faits enrichie)")
+                lines.append("")
+                lines.append(", ".join(f"`{c}`" for c in fact_cols))
+                lines.append("")
+
+            # Fichier genere
+            fichiers = params.get("fichiers", [])
+            if fichiers:
+                lines.append("#### Fichier généré dans `mapping_tables/`")
+                lines.append("")
+                for f in fichiers:
+                    lines.append(f"- `{f}`")
+                lines.append("")
+            continue
+
         # Section speciale pour le Star Schema
         if "decomposer_table_plate" in step and params.get("dimensions"):
             lines.append(f"### {i}. {label}")

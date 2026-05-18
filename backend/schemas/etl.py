@@ -27,6 +27,7 @@ class ETLRequest(BaseModel):
     Attributes:
         session_id      : Identifiant unique de session (cree dans Directus).
         input_path      : Chemin du fichier source relatif a la racine backend/.
+    input_url: Optional[str] = None  # URL REST, CSV distant, OpenData
         missing_strategy: Strategie d'imputation des valeurs manquantes.
         fill_mode       : Mode de remplissage pour les imputations.
         outlier_action  : Action appliquee aux valeurs aberrantes detectees.
@@ -44,10 +45,13 @@ class ETLRequest(BaseModel):
         description="Identifiant unique de session cree dans Directus",
         min_length=1,
     )
-    input_path: str = Field(
-        ...,
-        description="Chemin du fichier source (CSV, Excel, JSON, Parquet)",
-        min_length=1,
+    input_path: Optional[str] = Field(
+        default=None,
+        description="Chemin du fichier source local (CSV, Excel, JSON, Parquet) — optionnel si input_url",
+    )
+    input_url: Optional[str] = Field(
+        default=None,
+        description="URL REST distante (alternative a input_path)",
     )
     missing_strategy: Literal["auto", "constant", "drop"] = Field(
         default="auto",
@@ -92,19 +96,19 @@ class ETLRequest(BaseModel):
 
     @field_validator("input_path")
     @classmethod
-    def input_path_not_empty(cls, v: str) -> str:
+    def input_path_not_empty(cls, v):
         """Verifie que le chemin n'est pas vide apres strip."""
-        if not v.strip():
+        if v is not None and not v.strip():
             raise ValueError("input_path ne peut pas etre vide ou contenir uniquement des espaces")
-        return v.strip()
+        return v.strip() if v else v
 
     @field_validator("session_id")
     @classmethod
     def session_id_not_empty(cls, v: str) -> str:
         """Verifie que le session_id n'est pas vide apres strip."""
-        if not v.strip():
+        if v is not None and not v.strip():
             raise ValueError("session_id ne peut pas etre vide")
-        return v.strip()
+        return v.strip() if v else v
 
     model_config = {
         "json_schema_extra": {

@@ -43,6 +43,7 @@ import numpy as np
 import pandas as pd
 
 from schemas.etl import ETLRequest, ETLResponse
+from skills.etl_skill.core.loader import load_from_url
 from skills.etl_skill.core.cleaner import (
     fix_data_types,
     format_date_columns,
@@ -325,6 +326,23 @@ async def run_etl_pipeline(request: ETLRequest) -> ETLResponse:
     )
 
     # ── Preparation des chemins de sortie ────────────────────────────────────
+    # Chargement depuis URL si pas de fichier local
+    if not request.input_path and getattr(request, 'input_url', None):
+        import tempfile
+        logger.info('[ETL] URL detectee : %s', request.input_url)
+        df_url, _meta = load_from_url(request.input_url)
+        _tmp = tempfile.NamedTemporaryFile(
+            suffix='.csv', delete=False,
+            dir='data/raw', prefix='url_import_',
+        )
+        df_url.to_csv(_tmp.name, index=False)
+        logger.info('[ETL] URL -> CSV : %s (%d lignes x %d cols)',
+                     _tmp.name, len(df_url), df_url.shape[1])
+        try:
+            request = request.model_copy(update={'input_path': _tmp.name})
+        except Exception:
+            request.input_path = _tmp.name
+
     source_path = Path(request.input_path)
     if not source_path.exists():
         return _error_response(
@@ -345,6 +363,32 @@ async def run_etl_pipeline(request: ETLRequest) -> ETLResponse:
     # ── Etape 1 : Chargement (mono ou multi-feuilles) ────────────────────────
     t0 = time.monotonic()
     try:
+        # Chargement depuis URL distante (REST API, CSV, JSON)
+        if getattr(request, "input_url", None):
+            import tempfile
+            import os as _os
+            logger.info("[ETL] URL detectee : %s", request.input_url)
+            df_url, _meta_url = load_from_url(request.input_url)
+            _tmp = tempfile.NamedTemporaryFile(
+                suffix=".csv",
+                delete=False,
+                dir="data/raw",
+                prefix="url_import_",
+            )
+            df_url.to_csv(_tmp.name, index=False)
+            logger.info(
+                "[ETL] URL -> CSV : %s (%d lignes x %d cols)",
+                _os.path.basename(_tmp.name),
+                len(df_url),
+                df_url.shape[1],
+            )
+            try:
+                request = request.model_copy(
+                    update={"input_path": _tmp.name}
+                )
+            except Exception:
+                request.input_path = _tmp.name
+
         raw_data, metadata = load_dataset(
             request.input_path,
             sheet_name=None if source_path.suffix.lower() in {".xlsx", ".xlsm", ".xls"} else 0,
@@ -419,12 +463,45 @@ async def run_etl_pipeline(request: ETLRequest) -> ETLResponse:
             except Exception as exc:
                 errors.append(f"Push rapport qualite '{label}' : {exc}")
 
-    # ── Etape 4 : Construction Star Schema OU Table Jointe ───────────────────
-    # mapping_tables/ est TOUJOURS produit (independamment de dimensional_modeling)
+    # ── Etape 4 : Star Schema de chaque feuille + Table Jointe (si multi) ──────
+    # Etape 4A : decomposer_table_plate sur CHAQUE feuille (toujours)
+    # Etape 4B : creer_table_jointe si multi-feuilles avec liaisons FK→PK
+
     has_star_or_joined = False
 
+    # ── 4A : Star Schema individuel par feuille ──────────────────────────────
+    for nom_feuille, df_propre in feuilles_propres.items():
+        try:
+            star_result = decomposer_table_plate(df_propre, nom_feuille)
+            if star_result.get("has_star_schema"):
+                fichiers_crees = sauvegarder_star_schema(
+                    star_result, stem, nom_feuille, mapping_dir,
+                )
+                has_star_or_joined = True
+                rapport_dim = star_result.get("rapport", {})
+                fichiers_noms = (
+                    [f.name for f in fichiers_crees]
+                    if isinstance(fichiers_crees, (list, tuple))
+                    else []
+                )
+                _log_step(
+                    transformation_log,
+                    f"decomposer_table_plate[{nom_feuille}]",
+                    "decomposer_table_plate",
+                    {
+                        "n_dimensions": len(rapport_dim.get("dimensions", {})),
+                        "dimensions":   rapport_dim.get("dimensions", {}),
+                        "mesures":      rapport_dim.get("mesures", []),
+                        "fact_columns": rapport_dim.get("fact_columns", []),
+                        "fichiers":     fichiers_noms,
+                    },
+                    len(df_propre), len(df_propre), 0,
+                )
+        except Exception as exc:
+            errors.append(f"Star Schema '{nom_feuille}' : {exc}")
+
+    # ── 4B : Table Jointe globale (multi-feuilles uniquement) ────────────────
     if is_multi:
-        # Multi-feuilles : detecter relations FK→PK et faire la jointure
         try:
             schema_rel = detecter_schema_relationnel(feuilles_propres)
             if schema_rel.get("liaisons"):
@@ -433,41 +510,51 @@ async def run_etl_pipeline(request: ETLRequest) -> ETLResponse:
                 )
                 if chemin_jointe:
                     has_star_or_joined = True
+                    rows_jointe, cols_jointe = 0, 0
+                    fact_columns: list[str] = []
+                    mesures_jointe: list[str] = []
+                    try:
+                        df_joint = pd.read_csv(chemin_jointe)
+                        rows_jointe  = len(df_joint)
+                        cols_jointe  = df_joint.shape[1]
+                        fact_columns = list(df_joint.columns)
+                        for c in df_joint.columns:
+                            cl = c.lower()
+                            if cl.startswith("id_") or cl.endswith("_id") or cl == "id":
+                                continue
+                            if not pd.api.types.is_numeric_dtype(df_joint[c]):
+                                continue
+                            if is_protected_column(c, df_joint[c]):
+                                continue
+                            if df_joint[c].nunique() <= 1 or df_joint[c].std() == 0:
+                                continue
+                            mesures_jointe.append(c)
+                    except Exception as exc:
+                        errors.append(f"Analyse table jointe : {exc}")
+
+                    dimensions_list = sorted({l["cible_table"] for l in schema_rel["liaisons"]})
                     _log_step(transformation_log, "creer_table_jointe",
                               "creer_table_jointe",
-                              {"liaisons": len(schema_rel["liaisons"])},
+                              {
+                                  "n_liaisons":      len(schema_rel["liaisons"]),
+                                  "table_fait":      schema_rel.get("table_fait", ""),
+                                  "liaisons":        schema_rel["liaisons"],
+                                  "fichiers":        [chemin_jointe.name],
+                                  "feuilles_sources": list(feuilles_propres.keys()),
+                                  "rows_jointe":     rows_jointe,
+                                  "cols_jointe":     cols_jointe,
+                                  "dimensions_tables": dimensions_list,
+                                  "mesures":         mesures_jointe,
+                                  "fact_columns":    fact_columns,
+                              },
                               rows_init_total, rows_init_total, 0)
             else:
-                logger.info(
-                    "[ETL] Multi-feuilles sans relations FK→PK detectees → "
-                    "decomposition de chaque feuille",
-                )
+                logger.info("[ETL] Aucune liaison FK→PK detectee entre les feuilles")
         except Exception as exc:
-            errors.append(f"Detection relations : {exc}")
-
-    # Mono-feuille OU multi-feuilles sans relations : decomposer chaque feuille
-    if not has_star_or_joined:
-        for nom_feuille, df_propre in feuilles_propres.items():
-            try:
-                star_result = decomposer_table_plate(df_propre, nom_feuille)
-                if star_result.get("has_star_schema"):
-                    sauvegarder_star_schema(
-                        star_result, stem, nom_feuille, mapping_dir,
-                    )
-                    has_star_or_joined = True
-                    _log_step(transformation_log,
-                              f"decomposer_table_plate[{nom_feuille}]",
-                              "decomposer_table_plate",
-                              {"n_dimensions": len(star_result.get("rapport", {}).get("dimensions", {}))},
-                              len(df_propre), len(df_propre), 0)
-            except Exception as exc:
-                errors.append(f"Star Schema '{nom_feuille}' : {exc}")
+            errors.append(f"Table jointe : {exc}")
 
     if not has_star_or_joined:
-        logger.info(
-            "[ETL] Aucun Star Schema ni TABLE JOINTE construit "
-            "(donnees insuffisantes en mesures/dimensions)",
-        )
+        logger.info("[ETL] Aucune structure dimensionnelle construite")
 
     # ── Etape 5 : DataFrame principal pour la reponse Pydantic ───────────────
     # On utilise la premiere feuille comme reference pour les metriques globales
