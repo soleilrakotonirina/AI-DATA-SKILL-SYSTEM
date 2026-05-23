@@ -1,333 +1,418 @@
-# AI DATA SKILL SYSTEM — Etape 1 : ETL Skill
+# AI DATA SKILL SYSTEM — Étape 1 : ETL Skill
 
-> **Session 3.1** | Construction du premier Skill du pipeline | Stack v2.0
+## Ce qui a été construit dans cette étape
 
----
+Le **ETL Skill** est le premier module du système. Il prend un fichier brut ou une
+URL distante et produit des données propres, structurées et exploitables par les
+Skills suivants (Visualization, Modeling, Prediction...).
 
-## Objectif de cette etape
+Pipeline en **16 étapes** entièrement automatisé :
 
-Construire le **premier Skill** du systeme : un module autonome de **nettoyage et transformation** des datasets bruts, qui sert de fondation a tous les Skills suivants (Visualization, Modeling, Analysis).
-
-A l'issue de cette etape, le projet dispose de :
-- Un endpoint FastAPI **POST /api/etl/run** valide par Pydantic v2
-- Un pipeline ETL complet en **16 etapes** orchestrees par async/await
-- Une publication automatique du **rapport MDX dans Directus** (collection `reports_mdx`)
-- Une couverture **40+ tests unitaires** incluant FastAPI TestClient et mocks Directus/Gemini
-- Un **script Python reproductible** genere automatiquement, executable sur tout nouveau dataset du meme format
-
-Le pipeline transforme un dataset brut (CSV, Excel, JSON, Parquet) en dataset propre, audit complet, et rapport narratif lisible dans le dashboard Next.js.
-
----
-
-## Stack technique de cette etape
-
-| Composant | Technologie | Role |
-|-----------|-------------|------|
-| Backend | FastAPI 0.110+ | Endpoint POST /api/etl/run |
-| Validation | Pydantic v2 | ETLRequest et ETLResponse |
-| CMS | Directus 10+ | Stockage du rapport MDX |
-| DB Directus | SQLite 3 | Base zero installation (fichier .db local) |
-| IA | Gemini 2.5 Flash | Suggestions de transformations |
-| Manipulation | pandas 2.2+, numpy 2.0+ | Nettoyage et transformation |
-| ML preprocessing | scikit-learn 1.5+ | LabelEncoder, OneHotEncoder, StandardScaler |
-| Tests | pytest 8+, pytest-asyncio | 40+ tests unitaires + endpoint |
+- **Chargement multi-format** : CSV, Excel (multi-feuilles), JSON, Parquet, URL distante
+- **Chargement depuis URL** : REST API paginée (World Bank, OpenData), CSV distant, JSON, XML
+- **Normalisation du schéma** : noms de colonnes standardisés via scoring v3
+- **Nettoyage** : valeurs manquantes, doublons, outliers IQR/Z-score
+- **Transformation** : encodage catégoriel, scaling, features dérivées
+- **Modélisation dimensionnelle** : construction automatique d'un Star Schema + table jointe
+- **Rapports qualité** : avant/après avec métriques complètes, poussés dans Directus
+- **Script ETL reproductible** : génération d'un script Python autonome re-exécutable
+- **Rapport MDX** : publié dans Directus, lisible depuis Next.js
 
 ---
 
-## Demarrage rapide
+## Architecture du pipeline
 
-### Pre-requis
-
-```bash
-python --version    # >= 3.10
-node --version      # >= 18
-npm --version       # >= 9
 ```
-
-Cle Gemini gratuite a obtenir sur https://aistudio.google.com (Get API Key).
-
-### 1. Backend FastAPI
-
-```bash
-cd backend
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-cp .env.example .env
-# Renseigner GEMINI_API_KEY, DIRECTUS_URL, DIRECTUS_TOKEN
-uvicorn api.main:app --reload --port 8000
+Fichier local / URL distante
+          │
+          ▼
+┌─────────────────────────────────────┐
+│  loader.py                          │
+│  - CSV, Excel, JSON, Parquet        │
+│  - URL REST avec pagination auto    │
+│    (page / offset / cursor)         │
+│  - World Bank, OpenData, DRF, OData │
+│  - XML converti en JSON             │
+│  → DataFrame brut + métadonnées     │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  normalizer.py  (v3 scoring)        │
+│  - Standardise les noms de colonnes │
+│  - Scoring : PascalCase(4,3) >      │
+│    Acronyme(4,2) > Title(4,1) >     │
+│    Title court(3,0) > UPPER(2,0) >  │
+│    lower(1,0)                       │
+│  - Règle préfixe pour fuzzy         │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  cleaner.py                         │
+│  - Nettoyage noms de colonnes       │
+│  - Valeurs manquantes               │
+│    (médiane / mode / constante /    │
+│     suppression)                    │
+│  - Suppression doublons             │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  transformer.py                     │
+│  - Outliers IQR ou Z-score          │
+│    (cap / remove / flag)            │
+│  - Encodage catégoriel              │
+│    (auto / label / onehot)          │
+│  - Scaling numérique                │
+│    (standard / minmax)              │
+│  - Features dérivées automatiques   │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  star_schema.py                     │
+│  - Détection auto dimensions/faits  │
+│    seuil adaptatif selon n_rows     │
+│    (0.70 petite → 0.40 grande)      │
+│  - BFS transitif pour jointures     │
+│  - creer_table_jointe()             │
+│  - 4 feuilles Excel → tables Star   │
+│  - Rejet annees (1900-2100)         │
+│  - Rejet téléphones (> 10k)         │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────┐
+│  validator.py + exporter.py         │
+│  - Rapport qualité AVANT / APRÈS    │
+│  - Script ETL Python reproductible  │
+│  - Sauvegarde CSV/Parquet propre    │
+│  - Rapport MDX → Directus           │
+└──────────────┬──────────────────────┘
+               │
+               ▼
+         Directus CMS
+    reports_mdx (3 rapports)
+    + fichiers data/processed/
 ```
-
-Documentation interactive : http://localhost:8000/docs
-
-### 2. Directus (Node.js natif + SQLite)
-
-```bash
-cd directus
-npm init directus-project@latest .
-npx directus start
-```
-
-Interface admin : http://localhost:8055
-
-Creer les 5 collections (sessions, reports_mdx, charts, pipeline_logs, user_profiles) via l'interface, ou appliquer le snapshot.
-
-```bash
-npx directus schema apply ./snapshots/schema.json
-```
-
-Generer un token admin dans Settings > Access Tokens et le copier dans `backend/.env`.
-
-### 3. Frontend Next.js
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Interface : http://localhost:3000
-
-### 4. Lancer le test de connexion
-
-```bash
-cd backend
-source .venv/bin/activate
-python tests/test_setup.py
-```
-
-Sortie attendue : `[OK] FastAPI` + `[OK] Directus Ping` + `[OK] Directus Auth` + `[OK] Next.js`.
 
 ---
 
-## Structure du ETL Skill
+## Paramètres ETLRequest
 
-Le ETL Skill suit la **separation core/ scripts/ examples/** definie dans le system prompt v2.0.
+| Paramètre | Type | Défaut | Description |
+|-----------|------|--------|-------------|
+| `session_id` | str | — | ID session Directus (obligatoire) |
+| `input_path` | str\|null | null | Chemin fichier local (CSV, Excel, JSON, Parquet) |
+| `input_url` | str\|null | null | URL distante REST (alternative à input_path) |
+| `missing_strategy` | enum | `"auto"` | `auto`=médiane/mode, `constant`=N/D/0, `drop`=suppression |
+| `fill_mode` | enum | `"smart"` | `smart`=adapté au type, `constant`=valeurs fixes |
+| `outlier_action` | enum | `"cap"` | `cap`=capping bornes, `remove`=ligne, `flag`=colonne |
+| `outlier_method` | enum | `"iqr"` | `iqr`=1.5×IQR, `zscore`=\|z\|>3 |
+| `encode_method` | enum | `"auto"` | `auto`=label si card≤10 sinon onehot, `label`, `onehot` |
+| `scale_method` | enum | `"standard"` | `standard`=StandardScaler, `minmax`=MinMaxScaler [0,1] |
+| `generate_script` | bool | `true` | Générer script ETL Python reproductible |
+| `dimensional_modeling` | bool | `false` | Construire Star Schema (tables faits + dimensions) |
+| `target_column` | str\|null | null | Colonne ML protégée des encodages et scalings |
+| `columns_to_exclude` | list | `[]` | Colonnes exclues de toutes les transformations |
+
+---
+
+## Chargement depuis URL (loader.py)
+
+Le loader supporte la pagination automatique pour les APIs REST.
+
+| Style API | Paramètre pagination | Exemple |
+|-----------|---------------------|---------|
+| World Bank | `page=N` | `api.worldbank.org/v2/...?format=json&per_page=50` |
+| OpenData offset | `offset=N&limit=L` | API INSEE, data.gouv.fr |
+| Cursor | `cursor=TOKEN` | APIs modernes |
+| DRF | `page=N` | Django REST Framework |
+| OData | `$skip=N` | Microsoft OData |
+
+```bash
+# Exemple World Bank
+uv run --env-file .env python -m skills.etl_skill.scripts.main \
+  --url "https://api.worldbank.org/v2/country/all/indicator/NY.GDP.MKTP.CD?format=json&per_page=50" \
+  --session-id session_worldbank
+```
+
+```
+INFO [Loader] Structure World Bank : page 1/352, total=17556
+INFO [Loader] Page 1 : 50 records (cumul : 50)
+INFO [ETL] URL -> CSV temporaire : url_import_xxx.csv (2500 lignes x 8 cols)
+```
+
+---
+
+## Modélisation dimensionnelle (star_schema.py)
+
+Quand `dimensional_modeling=true`, le pipeline construit automatiquement :
+
+**Détection des colonnes :**
+- `_est_dimension()` : seuil adaptatif — 70% unicité pour petites tables, 40% pour grandes
+- `_est_mesure()` : rejette les années (1900-2100), téléphones (>10k à faible variance)
+- `_est_temporelle()` : mots-clés + valeurs entières dans plage temporelle
+
+**Résultat pour un Excel multi-feuilles :**
+```
+data/processed/Donnees_Universitaires/
+├── core_data/
+│   ├── Etudiants.csv
+│   ├── Cours.csv
+│   └── Enseignants.csv
+└── mapping_tables/
+    ├── Donnees_Universitaires_JOINTE.csv   ← table jointe finale
+    ├── dim_niveau_etude.csv
+    ├── dim_ville.csv
+    └── fact_inscriptions.csv
+```
+
+**BFS transitif :** si `Inscriptions → Cours` et `Cours → Enseignants`,
+la table jointe inclut automatiquement les colonnes Enseignants.
+
+---
+
+## Normalizer v3 (normalizer.py)
+
+Système de scoring pour choisir le meilleur nom de colonne :
+
+| Format | Score principal | Score secondaire | Exemple |
+|--------|----------------|-----------------|---------|
+| PascalCase | 4 | 3 | `NomEtudiant` |
+| Acronyme court | 4 | 2 | `ECTS` |
+| Title long (>8 chars) | 4 | 1 | `Nom Etudiant` |
+| Title court | 3 | 0 | `Nom` |
+| UPPER long | 2 | 0 | `NOM_ETUDIANT` |
+| lower | 1 | 0 | `nom_etudiant` |
+
+Règle préfixe pour fuzzy matching : `Madagascar` > `Madagascararr` ✓
+
+---
+
+## Sorties ETLResponse
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `skill` | str | Toujours `"ETL"` |
+| `session_id` | str | ID session |
+| `status` | str | `"success"` ou `"error"` |
+| `rows_before` / `rows_after` | int | Lignes avant/après nettoyage |
+| `cols_before` / `cols_after` | int | Colonnes avant/après |
+| `nulls_removed` | int | Valeurs manquantes traitées |
+| `duplicates_removed` | int | Doublons supprimés |
+| `script_path` | str | Chemin du script ETL reproductible |
+| `report_md_path` | str | Chemin rapport Markdown local |
+| `report_mdx_id` | str | UUID du rapport MDX dans Directus |
+| `transformation_log` | list | Journal complet des 16 étapes |
+| `errors` | list | Erreurs non bloquantes |
+
+---
+
+## Structure des fichiers
 
 ```
 backend/
 ├── schemas/
-│   └── etl.py                 ETLRequest et ETLResponse (Pydantic v2)
+│   └── etl.py                 ETLRequest + ETLResponse (Pydantic v2)
 │
 ├── src/utils/
-│   └── directus_client.py     Client HTTP async pour Directus
+│   ├── directus_client.py     Client HTTP async (push MDX, charts, logs)
+│   └── gemini_client.py       Rotation automatique clés Gemini
 │
 ├── api/routes/
 │   └── etl.py                 Endpoint POST /api/etl/run
 │
 ├── skills/etl_skill/
 │   ├── SKILL.md               Documentation LLM (frontmatter YAML)
-│   ├── api-guide.md           Guide integration FastAPI + TypeScript
+│   ├── api-guide.md           Guide intégration FastAPI + TypeScript
 │   │
-│   ├── core/                  Logique Python pure (testable seule)
-│   │   ├── cleaner.py             Chargement multi-format + nettoyage
-│   │   ├── transformer.py         Encodage, scaling, outliers, features
-│   │   ├── normalizer.py           Normalisation schema + types + metriques
-│   │   ├── star_schema.py         Construction d'un schema en etoile pour ML
-│   │   ├── validator.py           Rapports qualite + integrite
-│   │   └── exporter.py            Sauvegarde + rapport + script ETL
+│   ├── core/
+│   │   ├── cleaner.py         Chargement multi-format + nettoyage
+│   │   ├── loader.py          Chargement URL distante + pagination auto
+│   │   ├── transformer.py     Encodage + scaling + outliers + features
+│   │   ├── normalizer.py      Normalisation schéma v3 (scoring)
+│   │   ├── star_schema.py     Star Schema + BFS transitif + table jointe
+│   │   ├── validator.py       Rapports qualité avant/après
+│   │   └── exporter.py        Sauvegarde + rapport Markdown + script ETL
 │   │
-│   ├── scripts/               Interface orchestrateur
-│   │   ├── main.py                Point d'entree pour executor.py + CLI
-│   │   ├── logic.py               Pipeline async en 16 etapes
-│   │   └── helpers.py             Utilitaires partages
+│   ├── scripts/
+│   │   ├── main.py            CLI (--input / --url / --plan) + executor.py
+│   │   ├── logic.py           Pipeline async 16 étapes
+│   │   └── helpers.py         Utilitaires partagés
 │   │
 │   └── examples/
-│       ├── example_usage.py       Exemple complet avec dataset synthetique
-│       ├── sample_config.json     Plan JSON d'exemple
-│       └── expected_output.md     Description des sorties attendues
+│       ├── example_usage.py   Exemple complet avec dataset synthétique
+│       ├── sample_config.json Plan JSON d'exemple
+│       └── expected_output.md Description des sorties attendues
 │
 └── tests/
-    └── test_etl.py            40+ tests unitaires + endpoint FastAPI
-```
-
-### Separation core/ vs scripts/
-
-| Dossier | Role | Connaissance du systeme IA |
-|---------|------|----------------------------|
-| `core/` | Logique metier pure (pandas, sklearn) | Aucune. Testable seul, importable depuis n'importe ou. |
-| `scripts/` | Pont entre orchestrateur et core | Connait l'ETLRequest, Directus, le push MDX, l'async/await. |
-
-### Flux d'execution
-
-```
-Next.js
-   │
-   │  POST /api/etl/run avec ETLRequest JSON
-   ▼
-FastAPI api/routes/etl.py
-   │
-   │  Validation Pydantic automatique (422 si invalide)
-   ▼
-skills/etl_skill/scripts/logic.py
-   │
-   │  16 etapes orchestrees, appels async vers Directus
-   ▼
-skills/etl_skill/core/ (cleaner, transformer, validator, exporter)
-   │
-   │  Logique Python pure, retourne dataframes et metriques
-   ▼
-src/utils/directus_client.py
-   │
-   │  push_report_mdx() → Directus collection reports_mdx
-   ▼
-ETLResponse Pydantic
-   │
-   │  Retour HTTP 200 avec report_mdx_id
-   ▼
-Next.js getReportMDX(id) → MDXRenderer
+    └── test_etl.py            Tests unitaires + endpoint FastAPI
 ```
 
 ---
 
-## Tester le ETL Skill
+## Démarrage rapide
 
-### Via Swagger UI
+### Variables d'environnement
 
-Ouvrir http://localhost:8000/docs, deplier `POST /api/etl/run`, cliquer sur "Try it out", coller le JSON.
+```bash
+# backend/.env
+GEMINI_API_KEY=AIzaSy...
+GEMINI_API_KEY_2=AIzaSy...    # Rotation si quota (optionnel)
+DIRECTUS_URL=http://localhost:8055
+DIRECTUS_TOKEN=votre_token
 
-```json
-{
-  "session_id": "test_session_001",
-  "input_path": "data/raw/customers.csv",
-  "missing_strategy": "auto",
-  "fill_mode": "smart",
-  "outlier_action": "cap",
-  "generate_script": true,
-  "target_column": "churn",
-  "columns_to_exclude": ["customer_id"]
-}
+DATA_RAW_DIR=./data/raw
+DATA_PROCESSED_DIR=./data/processed
 ```
 
-### Via CLI (mode standalone)
+### Lancer le pipeline
 
 ```bash
 cd backend
-source venv/bin/activate
 
-# Avec un plan JSON complet
-uv run python -m skills.etl_skill.scripts.main --plan skills/etl_skill/examples/sample_config.json
+# Fichier local CSV ou Excel
+uv run --env-file .env python -m skills.etl_skill.scripts.main \
+  --input data/raw/Donnees_Universitaires.xlsx \
+  --session-id session_etl_001
 
-# Avec juste un fichier (autres params par defaut)
+# Fichier local avec Star Schema
+uv run --env-file .env python -m skills.etl_skill.scripts.main \
+  --input data/raw/Donnees_Universitaires.xlsx \
+  --session-id session_etl_002
 
-uv run --env-file .env python -m skills.etl_skill.scripts.main   --input data/raw/Donnees_Universitaires.csv   --session-id session_star_report
+# URL distante (World Bank)
+uv run --env-file .env python -m skills.etl_skill.scripts.main \
+  --url "https://api.worldbank.org/v2/country/all/indicator/NY.GDP.MKTP.CD?format=json&per_page=50" \
+  --session-id session_worldbank
 
-# Avec URL (exemple avec API dummyjson)
-uv run --env-file .env python -m skills.etl_skill.scripts.main --url "https://dummyjson.com/products?limit=30&skip=0" --session-id session_dummyjson_test
-
+# Via plan JSON orchestrateur
+uv run --env-file .env python -m skills.etl_skill.scripts.main \
+  --plan examples/sample_config.json \
+  --session-id session_plan_001
 ```
 
-### Via l'exemple Python
+### Résultat attendu dans les logs
+
+```
+INFO [ETL] Demarrage pipeline — session=session_etl_001, input=Donnees_Universitaires.xlsx
+INFO [Loader] Multi-feuilles detecte : 4 feuilles (Inscriptions, Etudiants, Cours, Enseignants)
+INFO [Normalizer] Colonnes normalisees : 33 colonnes traitees, score moyen=3.8
+INFO [Cleaner] CSV charge : Donnees_Universitaires.xlsx (353 lignes x 33 colonnes)
+INFO [Cleaner] Aucun doublon detecte
+INFO [Validator] Rapport qualite 'before' ecrit : outputs/rapport_etl/...
+INFO [StarSchema] 4 tables construites + table JOINTE (353 lignes x 33 cols)
+INFO [Exporter] Script ETL reproductible genere : outputs/.../etl_script_xxx.py
+INFO [Directus] 3 rapports MDX pousses (before / after / comparatif)
+INFO [ETL] Pipeline termine en 3.2s — status=success, errors=0
+```
+
+### Via FastAPI Swagger
 
 ```bash
-uv run --env-file .env python -m skills.etl_skill.examples.example_usage
+uvicorn api.main:app --reload --port 8000
+# http://localhost:8000/docs → POST /api/etl/run
 ```
 
-Cet exemple cree un dataset synthetique avec des problemes de qualite, execute le pipeline complet (Directus mocke), et affiche le rapport comparatif avant/apres.
-
-### Via Next.js
-
-Aller sur http://localhost:3000/upload, uploader un fichier CSV, observer le rapport MDX se generer en direct.
+```json
+{
+  "session_id":          "test_swagger",
+  "input_path":          "data/raw/Donnees_Universitaires.xlsx",
+  "missing_strategy":    "auto",
+  "outlier_action":      "cap",
+  "encode_method":       "auto",
+  "scale_method":        "standard",
+  "generate_script":     true,
+  "dimensional_modeling": true,
+  "target_column":       null,
+  "columns_to_exclude":  []
+}
+```
 
 ### Via les tests
 
 ```bash
-cd backend
-uv run --env-file .env  pytest tests/test_etl.py -v
-uv run --env-file .env pytest tests/test_etl.py --cov=skills/etl_skill --cov-report=term-missing
+pytest tests/test_etl.py -v --cov=skills/etl_skill/core
 ```
 
-Resultat attendu : **40+ tests passent**, couverture > 85%.
+---
+
+## Pipeline 16 étapes (logic.py)
+
+| Étape | Module | Action |
+|-------|--------|--------|
+| 1 | `loader.py` | Chargement multi-format (CSV/Excel/JSON/Parquet) |
+| 2 | `loader.py` | Chargement URL distante avec pagination auto |
+| 3 | `normalizer.py` | Scoring v3 + normalisation noms de colonnes |
+| 4 | `cleaner.py` | Nettoyage noms colonnes (sanitize) |
+| 5 | `cleaner.py` | Valeurs manquantes (médiane/mode/constante/drop) |
+| 6 | `cleaner.py` | Suppression doublons |
+| 7 | `transformer.py` | Détection + traitement outliers (IQR ou Z-score) |
+| 8 | `transformer.py` | Encodage variables catégorielles |
+| 9 | `transformer.py` | Scaling variables numériques |
+| 10 | `transformer.py` | Génération features dérivées automatiques |
+| 11 | `star_schema.py` | Construction Star Schema + table jointe (si activé) |
+| 12 | `validator.py` | Rapport qualité AVANT (métriques complètes) |
+| 13 | `validator.py` | Rapport qualité APRÈS |
+| 14 | `exporter.py` | Sauvegarde datasets nettoyés (CSV + Parquet) |
+| 15 | `exporter.py` | Génération script ETL Python reproductible |
+| 16 | `directus_client.py` | Push 3 rapports MDX → Directus |
 
 ---
 
-## Fichiers produits par cette etape
+## Formats d'entrée supportés
 
-| Fichier | Type | Role |
-|---------|------|------|
-| `backend/schemas/etl.py` | Python | ETLRequest et ETLResponse Pydantic v2 |
-| `backend/src/utils/directus_client.py` | Python | Client HTTP async Directus |
-| `backend/api/routes/etl.py` | Python | Endpoint POST /api/etl/run |
-| `backend/skills/etl_skill/core/cleaner.py` | Python | Chargement et nettoyage |
-| `backend/skills/etl_skill/core/transformer.py` | Python | Encodage, scaling, outliers, features |
-| `backend/skills/etl_skill/core/validator.py` | Python | Rapports qualite, integrite |
-| `backend/skills/etl_skill/core/exporter.py` | Python | Sauvegarde, rapport, script ETL |
-| `backend/skills/etl_skill/scripts/main.py` | Python | Point d'entree + CLI |
-| `backend/skills/etl_skill/scripts/logic.py` | Python | Pipeline async en 16 etapes |
-| `backend/skills/etl_skill/scripts/helpers.py` | Python | Utilitaires partages |
-| `backend/skills/etl_skill/SKILL.md` | Markdown | Documentation LLM (frontmatter YAML) |
-| `backend/skills/etl_skill/api-guide.md` | Markdown | Guide integration FastAPI + TypeScript |
-| `backend/skills/etl_skill/examples/example_usage.py` | Python | Exemple complet |
-| `backend/skills/etl_skill/examples/sample_config.json` | JSON | Plan JSON d'exemple |
-| `backend/skills/etl_skill/examples/expected_output.md` | Markdown | Description sorties attendues |
-| `backend/tests/test_etl.py` | Python | 40+ tests unitaires |
-
-**Total : 16 fichiers** soit environ **4000 lignes de code Python et Markdown**.
+| Format | Extension | Multi-feuilles | Notes |
+|--------|-----------|---------------|-------|
+| CSV | `.csv` | Non | `low_memory=False` |
+| Excel | `.xlsx`, `.xls` | **Oui** | Chaque feuille = dataset indépendant |
+| JSON | `.json` | Non | |
+| Parquet | `.parquet` | Non | Via pyarrow |
+| URL REST | HTTP(S) | Non | Pagination auto |
+| URL CSV | HTTP(S) | Non | Téléchargement direct |
 
 ---
 
-## Variables d'environnement necessaires
+## Ajouter le endpoint au router FastAPI
 
-Configuration dans `backend/.env`. Voir `backend/.env.example` pour le template complet.
-
-| Variable | Obligatoire | Description |
-|----------|-------------|-------------|
-| GEMINI_API_KEY | Recommande | Cle API Gemini pour suggestions IA |
-| DIRECTUS_URL | Oui | URL du serveur Directus (par defaut http://localhost:8055) |
-| DIRECTUS_TOKEN | Oui | Token admin Directus pour publier les rapports |
-| FASTAPI_PORT | Non | Port d'ecoute FastAPI (defaut 8000) |
-| CORS_ORIGINS | Non | URL Next.js autorisees (defaut http://localhost:3000) |
-| ETL_NULL_THRESHOLD | Non | Seuil de nullite pour suppression colonne (defaut 0.5) |
-| ETL_IQR_MULTIPLIER | Non | Multiplicateur IQR pour outliers (defaut 1.5) |
-| LOG_LEVEL | Non | Niveau de logging (defaut INFO) |
-
-Cote Next.js, configuration dans `frontend/.env.local`.
-
-| Variable | Description |
-|----------|-------------|
-| NEXT_PUBLIC_FASTAPI_URL | URL du backend (http://localhost:8000) |
-| NEXT_PUBLIC_DIRECTUS_URL | URL de Directus (http://localhost:8055) |
-| DIRECTUS_TOKEN | Token read-only Directus pour les Server Components |
-
----
-
-## Validation de l'Etape 1
-
-Avant de passer a l'Etape 2, verifier que les 7 points suivants sont valides.
-
-```
-[ ] Tous les fichiers de la liste sont presents et complets
-[ ] FastAPI demarre sans erreur sur le port 8000
-[ ] Swagger /docs affiche bien POST /api/etl/run
-[ ] Directus tourne sur le port 8055 avec les 5 collections creees
-[ ] Token Directus configure dans backend/.env
-[ ] Tests passent : pytest tests/test_etl.py -v (40+ tests OK)
-[ ] Exemple execute sans erreur : python -m skills.etl_skill.examples.example_usage
+```python
+# backend/api/main.py
+from api.routes.etl import router as etl_router
+app.include_router(etl_router, prefix="/api")
 ```
 
-Quand les 7 cases sont cochees, l'Etape 1 est validee.
+---
+
+## Fichiers produits par cette étape
+
+| Fichier | Lignes | Rôle |
+|---------|--------|------|
+| `schemas/etl.py` | ~180 | Pydantic ETLRequest / ETLResponse |
+| `src/utils/directus_client.py` | ~150 | Client HTTP async Directus |
+| `src/utils/gemini_client.py` | ~160 | Rotation clés Gemini |
+| `api/routes/etl.py` | ~80 | Endpoint FastAPI POST /api/etl/run |
+| `core/cleaner.py` | ~350 | Chargement + nettoyage |
+| `core/loader.py` | ~447 | URL distante + pagination |
+| `core/transformer.py` | ~400 | Encodage + scaling + outliers |
+| `core/normalizer.py` | ~300 | Scoring v3 noms colonnes |
+| `core/star_schema.py` | ~500 | Star Schema + BFS + table jointe |
+| `core/validator.py` | ~250 | Rapports qualité |
+| `core/exporter.py` | ~300 | Sauvegarde + Markdown + script ETL |
+| `scripts/main.py` | ~235 | CLI + executor.py |
+| `scripts/logic.py` | ~500 | Pipeline 16 étapes |
+| `scripts/helpers.py` | ~100 | Utilitaires |
+| `tests/test_etl.py` | ~7554 | Tests unitaires complets |
 
 ---
 
-## Prochaine etape
+## Prochaine étape
 
-**Etape 2 — Visualization Skill (Session 2.2)**
+**Étape 2 — Visualization Skill (Session 2.2)**
 
-Le Visualization Skill consomme l'output du ETL Skill (`df_clean` + `report_mdx_id` Directus) et produit :
-- Charts Plotly JSON publies dans Directus (collection `charts`)
-- Rapport EDA MDX detaille publie dans Directus (collection `reports_mdx`)
-- Page Next.js `/eda/` avec composants PlotlyChart et MDXRenderer
+Classification automatique des colonnes, plan de graphiques via Gemini,
+8 types de graphiques style Power BI, substitution ID→Libellé,
+rapport EDA MDX complet avec KPIs.
 
-Endpoint attendu : `POST /api/visualization/eda` valide par `VisualizationRequest` Pydantic, retournant un `VisualizationResponse` avec la liste des `chart_id` Directus et le `report_mdx_id` EDA.
-
----
-
-## References
-
-- [Anthropic Skills Documentation](https://docs.anthropic.com/claude/docs/skills)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Pydantic v2 Documentation](https://docs.pydantic.dev/latest/)
-- [Directus REST API](https://docs.directus.io/reference/introduction.html)
-- [Gemini API google-genai SDK](https://ai.google.dev/gemini-api/docs)
-- [pandas Documentation](https://pandas.pydata.org/docs/)
-- [scikit-learn Preprocessing](https://scikit-learn.org/stable/modules/preprocessing.html)
+Endpoint : `POST /api/visualization/eda`
