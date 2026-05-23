@@ -1,0 +1,16 @@
+{
+  "step": 2,
+  "skill": "Visualization",
+  "endpoint": "/api/visualization/eda",
+  "params": {
+    "session_id": "user_42_2025-06-01_14-30-22",
+    "dataset_path": "data/processed/exportations_madagascar/core_data/exportations_dirty.csv",
+    "target_column": null,
+    "question": "Quelles regions exportent le plus en termes de revenu ?",
+    "export_formats": ["html", "png"],
+    "output_dir": "outputs/charts",
+    "generate_report": true,
+    "gemini_comments": true,
+    "columns_to_include": null
+  }
+}
