@@ -8,6 +8,8 @@
 
 ---
 
+![Open WebUI](https://img.shields.io/badge/Open_WebUI-black?style=flat-square)
+![FastMCP](https://img.shields.io/badge/MCP_FastMCP-4285F4?style=flat-square&logo=python&logoColor=white)
 ![Next.js](https://img.shields.io/badge/Next.js_14-000000?style=flat-square&logo=nextdotjs&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![Pydantic](https://img.shields.io/badge/Pydantic_v2-E92063?style=flat-square&logo=pydantic&logoColor=white)
@@ -60,30 +62,29 @@ L'utilisateur pose une question en langage naturel, uploade un dataset, et le sy
 
 ---
 
-## Architecture en 3 services
+## Architecture Nouvelle Génération (Open WebUI + MCP)
 
-```
+```text
 USER
- │  (question en langage naturel + upload dataset)
+ │  (upload fichiers + requêtes en langage naturel)
  ▼
-NEXT.JS FRONTEND (port 3000)     interface utilisateur React
- │  HTTP POST + SSE streaming
+OPEN WEBUI (port 8080)           Interface Chat unifiée & orchestration IA
+ │  appels d'outils (Tool Calling) via MCP
  ▼
-FASTAPI BACKEND (port 8000)      API Python exposant les Skills + Pydantic
- │  router.py → planner.py → executor.py
+SERVEURS MCP (FastMCP)           Bridges contextuels intelligents
+ │  - ETL MCP Server (port 8001)
+ │  - Viz MCP Server (port 8002)
  ▼
-GEMINI ORCHESTRATOR              cerveau central
- │  plan d'exécution JSON
- ▼
-SKILLS ENGINE                    séquencement dynamique
+SKILLS ENGINE (Python)           Modules d'intelligence autonomes
  │  ETL → Viz → Modeling → ML_Explanation → Prediction → Analysis
+ │  (Méta-skills : createur-de-competence, calculateur-tva, etc.)
  ▼
-DIRECTUS CMS (port 8055)         stockage MDX + charts + historique
- │  rapports MDX + Plotly JSON
+FILE SERVER (port 8090)          Service de fichiers HTTP pour Open WebUI
+ │  stockage et liens de téléchargements
  ▼
-NEXT.JS DASHBOARD                rendu MDX + Plotly.js + métriques
- ▼
-USER  ←  résultat final actionnable
+NEXT.JS DASHBOARD & DIRECTUS     Dashboard optionnel / Stockage persistant
+ │
+USER  ←  résultat (fichiers nettoyés, graphes, rapports)
 ```
 
 ---
@@ -129,76 +130,40 @@ backend/skills/*/core/            ← FONDATION (autonome, fonctionne seul)
 
 ## 📁 Structure du projet
 
-```
+```text
 ai-data-skill-system/
 │
-├── backend/                              FASTAPI BACKEND (Python)
-│   ├── api/
-│   │   main.py                           Point d'entrée FastAPI
-│   │   └── routes/                       Endpoints REST par Skill
-│   │       etl.py, visualization.py, modeling.py
-│   │       explanation.py, prediction.py, analysis.py
-│   │       execute.py, orchestrate.py, logs.py
+├── Open-WebUI/                           INTERFACE AGENTIQUE (Chat & Tools)
+│   ├── .venv/
+│   └── docker-compose.yml / runtime
+│
+├── backend/                              SERVEURS & INTELLIGENCE (Python)
+│   ├── mcp/                              SERVEURS FAST_MCP (Outils pour LLM)
+│   │   ├── etl_mcp/
+│   │   └── viz_mcp/
 │   │
-│   ├── schemas/                          PYDANTIC SCHEMAS (inputs/outputs)
-│   │   etl.py, visualization.py, modeling.py
-│   │   explanation.py, prediction.py, analysis.py
-│   │   execute.py, orchestrate.py
-│   │
-│   ├── llm_orchestrator/                 CERVEAU GEMINI
-│   │   router.py, planner.py, executor.py, prompt_engine.py
-│   │
-│   ├── skills/                           7 SKILLS AUTONOMES
+│   ├── skills/                           ÉCOSYSTÈME DES COMPÉTENCES AUTONOMES
 │   │   ├── etl_skill/
 │   │   ├── visualization_skill/
 │   │   ├── modeling_skill/
-│   │   ├── prediction_skill/
-│   │   ├── analysis_skill/
-│   │   ├── ml_explanation_skill/
-│   │   └── nextjs_builder_skill/
+│   │   ├── calculateur-tva-madagascar/
+│   │   └── createur-de-competence/
 │   │
-│   ├── src/utils/
-│   │   logger.py, config.py, helpers.py
-│   │   directus_client.py
+│   ├── api/                              FASTAPI (Endpoints Historiques)
+│   │   └── main.py
 │   │
-│   ├── data/                             raw/, processed/, external/
-│   ├── models/                           Modèles ML sérialisés (.pkl)
-│   ├── outputs/                          Graphiques, rapports PDF, exports CSV
-│   ├── tests/
-│   ├── notebooks/
+│   ├── llm_orchestrator/                 CERVEAU GEMINI (Workflow classique)
+│   │
+│   ├── file_server.py                    Serveur HTTP pour Open WebUI (port 8090)
+│   ├── data/                             raw/, processed/, uploads/
 │   ├── requirements.txt
-│   ├── .env
-│   └── config.yaml
+│   └── .env
 │
-├── frontend/                             NEXT.JS FRONTEND (TypeScript)
+├── frontend/                             NEXT.JS FRONTEND (Dashboard Optionnel)
 │   ├── app/
-│   │   layout.tsx, page.tsx
-│   │   upload/page.tsx
-│   │   eda/page.tsx
-│   │   modeling/page.tsx
-│   │   predictions/page.tsx
-│   │   insights/page.tsx
-│   │   terminal/page.tsx
-│   │
-│   ├── components/
-│   │   DataTable.tsx, PlotlyChart.tsx, MetricCard.tsx
-│   │   MDXRenderer.tsx, ChatInterface.tsx, PythonTerminal.tsx
-│   │   ProgressPipeline.tsx, SidebarNav.tsx
-│   │
-│   ├── lib/
-│   │   directus.ts, fastapi.ts
-│   │   hooks/useSSE.ts, hooks/usePipeline.ts
-│   │
-│   ├── types/
-│   ├── package.json
-│   ├── next.config.ts
-│   ├── tailwind.config.ts
-│   └── tsconfig.json
+│   └── components/
 │
-├── directus/
-│   ├── package.json
-│   ├── .env
-│   ├── snapshots/
+├── directus/                             CMS DIRECTUS (Stockage Optionnel)
 │   ├── database/
 │   └── uploads/
 │
@@ -207,17 +172,20 @@ ai-data-skill-system/
 
 ---
 
-##  Les 7 Skills
+##  L'Écosystème des Skills
 
-| Skill | Rôle | Endpoint FastAPI | Livrable Directus |
-|-------|------|------------------|-------------------|
-| **ETL Skill** | Nettoyage et transformation des données | `POST /api/etl/run` | Rapport MDX ETL |
-| **Visualization Skill** | Graphiques EDA et dashboards | `POST /api/visualization/eda` | Rapport EDA MDX + Plotly charts |
-| **Modeling Skill** | Entraînement ML automatisé | `POST /api/modeling/train` | Model Card MDX + charts ROC/Confusion |
-| **Prediction Skill** | Inférence batch et temps réel | `POST /api/prediction/run` | Fichier CSV prédictions |
-| **ML Explanation Skill** | Interprétabilité SHAP | `POST /api/explanation/shap` | SHAP charts + rapport MDX |
-| **Analysis Skill** | Insights business et synthèse | `POST /api/analysis/summary` | Rapport exécutif MDX |
-| **NextJS Builder Skill** | Génération de composants UI | — | Composants React générés |
+La plateforme s'enrichit dynamiquement via un système de **Skills autonomes**. 
+
+| Skill / Composant | Rôle | Interface / Exposition |
+|-------------------|------|------------------------|
+| **ETL Skill** | Nettoyage automatisé et préparation de données | MCP (`etl_auto`, `get_download_links`) |
+| **Visualization Skill** | Génération de graphiques EDA via LLM | MCP |
+| **Modeling Skill** | Entraînement ML automatisé | API FastAPI |
+| **Explanation Skill** | Interprétabilité SHAP | API FastAPI |
+| **Prediction Skill** | Inférence sur nouveaux datasets | API FastAPI |
+| **Analysis Skill** | Synthèse et insights business | API FastAPI |
+| **Méta-Skill Créateur** | `createur-de-competence` pour créer d'autres skills | Autonome / CLI |
+| **Skills Métier** | ex: `calculateur-tva-madagascar` | Autonome / LLM |
 
 ---
 
@@ -241,129 +209,77 @@ ai-data-skill-system/
 
 - Python >= 3.10
 - Node.js >= 18
+- Open WebUI installé localement ou via Docker
 - Une clé API Gemini (gratuite sur https://aistudio.google.com)
 
-### 1. Cloner le repo
+### 1. Cloner le repo & Initialiser l'environnement
 
 ```bash
 git clone https://github.com/votre-username/ai-data-skill-system.git
-cd ai-data-skill-system
-```
+cd ai-data-skill-system/backend
 
-### 2. Backend Python + FastAPI
+# Utilisation recommandée de 'uv' pour la rapidité
+uv venv
+source .venv/bin/activate              # Linux / Mac
+.venv\Scripts\activate                 # Windows
 
-```bash
-cd backend
-python -m venv venv
-source venv/bin/activate              # Linux / Mac
-venv\Scripts\activate                 # Windows
-
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 cp .env.example .env
-# Éditer .env et renseigner GEMINI_API_KEY et DIRECTUS_TOKEN
-
-uvicorn api.main:app --reload --port 8000
-# Swagger auto-généré : http://localhost:8000/docs
+# Éditer .env et renseigner GEMINI_API_KEY et les autres clés
 ```
 
-### 3. Directus CMS
+### 2. Démarrer les Serveurs MCP & Fichiers (Nouvelle Architecture)
 
 ```bash
-mkdir directus && cd directus
-npm init directus-project@latest .
-# Suivre l'assistant : email admin, mot de passe, base SQLite
+# Terminal 1 - ETL MCP Server (Port 8001)
+uv run --env-file .env python mcp/etl_mcp/server.py
 
-npx directus start
-# Accès : http://localhost:8055
+# Terminal 2 - Serveur de Fichiers (Port 8090)
+uv run --env-file .env python file_server.py
 ```
 
-Générer un token d'accès dans `Settings → Access Tokens`, puis le reporter dans `backend/.env` sur la ligne `DIRECTUS_TOKEN=`.
+### 3. Configurer Open WebUI (Interface Chat)
 
-### 4. Frontend Next.js
+1. Lancer [Open WebUI](https://docs.openwebui.com/) (ex: via Docker).
+2. Ajouter le serveur MCP : Allez dans `Settings > Admin Settings > External Connections > MCP Servers`. 
+   - Ajoutez : `http://host.docker.internal:8001/mcp` (ou l'URL locale appropriée).
+3. Ouvrez un chat avec votre modèle (ex: Gemini 2.5 Flash), uploadez un dataset, et demandez en langage naturel : *"Nettoie ce fichier et prépare un modèle de données en étoile"*.
 
-```bash
-cd frontend
-npm install
+### 4. Directus CMS & Frontend Next.js (Optionnel - Architecture Historique)
 
-cp .env.local.example .env.local
-# Renseigner NEXT_PUBLIC_FASTAPI_URL et NEXT_PUBLIC_DIRECTUS_URL
-
-npm run dev
-# Ouvre http://localhost:3000
-```
-
-### 5. Vérification finale
-
-Trois services doivent tourner en parallèle :
-
-| Service | URL | Vérification |
-|---------|-----|--------------|
-| FastAPI | http://localhost:8000 | `/docs` accessible |
-| Directus | http://localhost:8055 | Login admin fonctionnel |
-| Next.js | http://localhost:3000 | Page d'accueil affichée |
-
-### 6. Utiliser un Skill en mode standalone
-
-```python
-# Mode direct — core/ uniquement, sans orchestrateur
-from skills.etl_skill.core.cleaner import load_dataset, remove_duplicates
-
-df, metadata = load_dataset("data/raw/churn.csv")
-df_clean, report = remove_duplicates(df)
-print(f"Dataset : {df_clean.shape}")
-
-# Mode LLM — via scripts/ appelé par l'orchestrateur
-from skills.etl_skill.scripts.main import run_etl_skill
-
-result = run_etl_skill({
-    "dataset_path": "data/raw/churn.csv",
-    "session_id": "session_001",
-    "strategy_nulls": "impute",
-    "normalize": True
-})
-print(result["report_mdx_id"])
-```
+Si vous souhaitez utiliser le dashboard Next.js classique au lieu d'Open WebUI :
+1. Lancez Directus CMS (`npx directus start` sur le port 8055) et configurez les tokens.
+2. Lancez le client Next.js (`npm run dev` sur le port 3000).
+3. Lancez FastAPI root (`uvicorn api.main:app --reload`).
 
 ---
 
 ## Stack technologique
 
-### Frontend
+### Intelligence Artificielle & Orchestration
+
+| Technologie | Usage |
+|-------------|-------|
+| ![Open WebUI](https://img.shields.io/badge/-Open_WebUI-000?style=flat-square) | Interface Agentique Principale & Chat |
+| ![MCP](https://img.shields.io/badge/-Model_Context_Protocol-4285F4?style=flat-square) | FastMCP pour l'exposition des outils au LLM |
+| `google-genai` | SDK Gemini officiel |
+
+### Backend Data & Skills
 
 | Technologie | Version | Usage |
 |-------------|---------|-------|
-| ![Next.js](https://img.shields.io/badge/-Next.js-000?logo=nextdotjs&logoColor=white&style=flat-square) | >= 14 | Framework React App Router |
-| ![React](https://img.shields.io/badge/-React-61DAFB?logo=react&logoColor=black&style=flat-square) | 18 | Composants UI |
-| ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white&style=flat-square) | >= 5 | Typage statique |
-| ![Tailwind](https://img.shields.io/badge/-Tailwind-06B6D4?logo=tailwindcss&logoColor=white&style=flat-square) | >= 3 | Styles utilitaires |
-| ![Plotly](https://img.shields.io/badge/-Plotly.js-3F4F75?logo=plotly&logoColor=white&style=flat-square) | 2 | Graphiques interactifs |
-| `@directus/sdk` | latest | Client Directus |
-| `MDX` | 3 | Rendu rapports Directus |
-| `Zustand` | 4 | Gestion d'état global |
-
-### Backend
-
-| Technologie | Version | Usage |
-|-------------|---------|-------|
-| ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?logo=fastapi&logoColor=white&style=flat-square) | >= 0.110 | API REST asynchrone |
-| ![Pydantic](https://img.shields.io/badge/-Pydantic-E92063?logo=pydantic&logoColor=white&style=flat-square) | >= 2.7 | Validation des schémas |
+| ![FastAPI](https://img.shields.io/badge/-FastAPI-009688?logo=fastapi&logoColor=white&style=flat-square) | >= 0.110 | Serveurs MCP et Webhooks |
 | ![Pandas](https://img.shields.io/badge/-Pandas-150458?logo=pandas&logoColor=white&style=flat-square) | >= 2.2 | Manipulation des données |
-| ![scikit-learn](https://img.shields.io/badge/-scikit--learn-F7931E?logo=scikitlearn&logoColor=white&style=flat-square) | >= 1.5 | Algorithmes ML |
-| `XGBoost` | >= 2.0 | Gradient Boosting |
-| `LightGBM` | >= 4.3 | Gradient Boosting rapide |
+| ![scikit-learn](https://img.shields.io/badge/-scikit--learn-F7931E?logo=scikitlearn&logoColor=white&style=flat-square) | >= 1.5 | Algorithmes ML et preprocessing |
+| `XGBoost` / `LightGBM` | >= 2.0 | Modélisation prédictive performante |
 | `SHAP` | >= 0.44 | Interprétabilité ML |
-| ![Plotly](https://img.shields.io/badge/-Plotly-3F4F75?logo=plotly&logoColor=white&style=flat-square) | >= 5.22 | Graphiques (export JSON) |
-| `google-genai` | >= 1.0 | SDK Gemini officiel |
-| ![Pytest](https://img.shields.io/badge/-pytest-0A9EDC?logo=pytest&logoColor=white&style=flat-square) | >= 8.2 | Tests unitaires |
 
-### CMS
+### CMS (Dashboard Classique)
 
 | Technologie | Version | Usage |
 |-------------|---------|-------|
 | ![Directus](https://img.shields.io/badge/-Directus-6644AA?logo=directus&logoColor=white&style=flat-square) | >= 10 | CMS stockage MDX + charts |
-| ![SQLite](https://img.shields.io/badge/-SQLite-003B57?logo=sqlite&logoColor=white&style=flat-square) | 3 | Base de données (fichier .db) |
-| ![Node.js](https://img.shields.io/badge/-Node.js-339933?logo=nodedotjs&logoColor=white&style=flat-square) | >= 18 | Runtime Directus |
 
 ---
 
@@ -491,6 +407,6 @@ MIT — libre d'utilisation, de modification et de distribution.
 
 *AI DATA SKILL SYSTEM v1.0.0*
 
-*Stack : Next.js 14 · FastAPI · Pydantic · Directus MDX · Gemini 2.5 Flash*
+*Stack : Open WebUI · MCP (FastMCP) · FastAPI · Gemini 2.5 Flash · Directus MDX · Next.js 14*
 
 </div>
